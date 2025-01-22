@@ -1,0 +1,1 @@
+This repository holds the source code of the Server Monitor Tool API.

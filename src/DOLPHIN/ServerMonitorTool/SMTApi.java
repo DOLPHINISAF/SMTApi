@@ -3,13 +3,11 @@ package DOLPHIN.ServerMonitorTool;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.ByteBuffer;
-import java.util.*;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import org.json.*;
 
 public class SMTApi {
-    private WebSocketConnection connection;
     private final String serverURI = "ws://dolphinsibiu.ddns.net:1337";
     private String APIKey;
     private WebSocket webSocket;
@@ -35,20 +33,90 @@ public class SMTApi {
             webSocket.sendClose(0, "Closeddd");
         }
     }
-    public void AddParam(String nameID, String description){
+
+    private void Auth(){
+
+
+        JSONObject jsonObject = new JSONObject();
+
+        jsonObject.put("type", "auth");
+        jsonObject.put("source","api");
+        jsonObject.put("APIKey",APIKey);
+        String message = jsonObject.toString();
+
+
+        try {
+            webSocket.sendText(message, true);
+            System.out.println("Sent auth json!");
+        }
+        catch (IllegalStateException e){
+            System.out.println("Failed to send text to auth!");
+        }
+    }
+
+    public void AddParam(String nameID, String description, String unit){
+
+
+        JSONObject jsonObject = new JSONObject();
+
+        jsonObject.put("type", "add");
+        jsonObject.put("source","api");
+        jsonObject.put("nameID",nameID);
+        jsonObject.put("description",description);
+        jsonObject.put("unit",unit);
+
+        String message = jsonObject.toString();
+
+
+        try {
+            webSocket.sendText(message, true);
+            System.out.println("Sent addParam json");
+        }
+        catch (IllegalStateException e){
+            System.out.println("Failed to send text to add param");
+        }
 
     }
+
     public void SetApiKey(String APIKey){
         this.APIKey = APIKey;
+        Auth();
     }
-    public void  SendUpdate(String nameID, String value, String status){
 
+    public void SendUpdate(String nameID, int value){
+        SendUpdate(nameID,Integer.toString(value));
     }
+
     public void  SendUpdate(String nameID, String value){
 
-    }
-    public void SetStatus(String nameID, String status){
 
+        JSONObject jsonObject = new JSONObject();
+
+        jsonObject.put("type", "data");
+        jsonObject.put("source","api");
+        jsonObject.put("nameID",nameID);
+        jsonObject.put("data",value);
+
+        String message = jsonObject.toString();
+
+
+        try {
+            webSocket.sendText(message, true);
+            System.out.println("Sent Update json");
+        }
+        catch (IllegalStateException e){
+            System.out.println("Failed to send text to update");
+        }
+    }
+
+    public void SendText(String text){
+
+        try{
+            webSocket.sendText(text,true);
+        }
+        catch (IllegalStateException e){
+            System.out.println("ERROR!!");
+        }
     }
 
     public void Test(){
@@ -59,11 +127,9 @@ public class SMTApi {
             return;
         }
 
-        String text = "{\"test\":true,\n" +
-                        "\"source\":\"api\"}";
-        System.out.println("Sending text!");
-
-        webSocket.sendText(text,true);
+        Auth();
+        AddParam("TEST_NAME","MY DESCRIPTION","BYTES/SECOND");
+        SendUpdate("TEST_NAME", 10);
     }
 
 

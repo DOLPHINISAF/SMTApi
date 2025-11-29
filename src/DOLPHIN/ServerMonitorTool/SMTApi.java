@@ -3,55 +3,71 @@ package DOLPHIN.ServerMonitorTool;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import org.json.*;
 
 public class SMTApi {
-    private final String serverURI = "ws://dolphinsibiu.ddns.net:1337";
+
     private String APIKey;
-    private WebSocket webSocket;
-    private HttpClient client;
+    WebSocketConnection serverSocket;
+
+    ArrayList<Action> actions;
+
 
     public SMTApi() {
 
-        client = HttpClient.newHttpClient();
-        System.out.println("Created http client");
+        actions = new ArrayList<>();
 
-        URI server = URI.create(serverURI);
-        try {
-            webSocket = client.newWebSocketBuilder().buildAsync(server, new WebSocketListener()).join();
-            System.out.println("Created websocket");
+        serverSocket = new WebSocketConnection();
+
+        if(serverSocket.ConnectSocket()){
+            System.out.println("Error connecting socket! Check errors");
         }
-        catch (CompletionException e){
-            System.out.println("Caught CompletionException!");
-        }
-    }
-    public void Close() {
-        if(webSocket != null) {
-            System.out.println("Closing WebSocket!");
-            webSocket.sendClose(0, "Closeddd");
-        }
+
     }
 
     private void Auth(){
-
 
         JSONObject jsonObject = new JSONObject();
 
         jsonObject.put("type", "auth");
         jsonObject.put("source","api");
         jsonObject.put("APIKey",APIKey);
-        String message = jsonObject.toString();
 
 
-        try {
-            webSocket.sendText(message, true);
-            System.out.println("Sent auth json!");
+        if(!serverSocket.SendJson(jsonObject)){
+            System.out.println("Succesfully authentificated to server");
         }
-        catch (IllegalStateException e){
-            System.out.println("Failed to send text to auth!");
+        else{
+            System.out.println("Failed to authentificate to server!");
         }
+
+    }
+
+    private void HandleReceivedJSON(){
+
+        if(!serverSocket.queueMutex){
+            serverSocket.queueMutex = true;
+            JSONObject jsonObject = serverSocket.GetReceivedJSON();
+
+            if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
+                String actionName = jsonObject.getString("action_name");
+                actions.forEach((action) ->{
+                    if(Objects.equals(action.GetName(), actionName)){
+                        action.Run();
+                    }
+                });
+            }
+
+        }
+        serverSocket.queueMutex = false;
+    }
+
+    public void CreateAction(String actionName, Runnable code){
+        actions.add(new Action(actionName,code));
     }
 
     public void AddParam(String nameID, String description, String unit){
@@ -65,16 +81,8 @@ public class SMTApi {
         jsonObject.put("description",description);
         jsonObject.put("unit",unit);
 
-        String message = jsonObject.toString();
-
-
-        try {
-            webSocket.sendText(message, true);
-            System.out.println("Sent addParam json");
-        }
-        catch (IllegalStateException e){
-            System.out.println("Failed to send text to add param");
-        }
+        serverSocket.SendJson(jsonObject);
+        System.out.println("Added param");
 
     }
 
@@ -87,8 +95,7 @@ public class SMTApi {
         SendUpdate(nameID,Integer.toString(value));
     }
 
-    public void  SendUpdate(String nameID, String value){
-
+    public void SendUpdate(String nameID, String value){
 
         JSONObject jsonObject = new JSONObject();
 
@@ -97,86 +104,30 @@ public class SMTApi {
         jsonObject.put("nameID",nameID);
         jsonObject.put("data",value);
 
-        String message = jsonObject.toString();
-
-
-        try {
-            webSocket.sendText(message, true);
-            System.out.println("Sent Update json");
-        }
-        catch (IllegalStateException e){
-            System.out.println("Failed to send text to update");
-        }
+        serverSocket.SendJson(jsonObject);
     }
 
     public void SendText(String text){
 
-        try{
-            webSocket.sendText(text,true);
-        }
-        catch (IllegalStateException e){
-            System.out.println("ERROR!!");
-        }
+        serverSocket.SendText(text);
+        System.out.println("Added param");
     }
 
     public void Test(){
 
+        Auth();
 
-        if(webSocket == null){
+        if(!serverSocket.IsConnected()){
             System.out.println("Socket is not open/doesn not exist!");
             return;
         }
 
-        Auth();
         AddParam("TEST_NAME","MY DESCRIPTION","BYTES/SECOND");
         SendUpdate("TEST_NAME", 10);
     }
 
-
-    static class WebSocketListener implements WebSocket.Listener{
-
-        @Override
-        public void onOpen(WebSocket webSocket) {
-            System.out.println("WebSocket opened");
-            WebSocket.Listener.super.onOpen(webSocket);
-        }
-
-        @Override
-        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            System.out.println("Received message: " + data);
-            return WebSocket.Listener.super.onText(webSocket, data, last);
-        }
-
-        @Override
-        public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
-            System.out.println("Received binary data");
-            return WebSocket.Listener.super.onBinary(webSocket, data, last);
-        }
-
-        @Override
-        public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
-            System.out.println("Received ping");
-            return WebSocket.Listener.super.onPing(webSocket, message);
-        }
-
-        @Override
-        public CompletionStage<?> onPong(WebSocket webSocket, ByteBuffer message) {
-            System.out.println("Received pong");
-            return WebSocket.Listener.super.onPong(webSocket, message);
-        }
-
-        @Override
-        public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-            System.out.println("WebSocket closed: " + reason);
-            return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
-        }
-
-        @Override
-        public void onError(WebSocket webSocket, Throwable error) {
-            System.err.println("WebSocket error: " + error.getMessage());
-        }
+    public void Close() {
+        serverSocket.CloseSocket();
     }
-
 }
-
 

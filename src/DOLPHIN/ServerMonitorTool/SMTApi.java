@@ -53,6 +53,8 @@ public class SMTApi {
             serverSocket.queueMutex = true;
             JSONObject jsonObject = serverSocket.GetReceivedJSON();
 
+            //TODO: Make this a switch for multiple types
+
             if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
                 String actionName = jsonObject.getString("action_name");
                 actions.forEach((action) ->{
@@ -60,6 +62,10 @@ public class SMTApi {
                         action.Run();
                     }
                 });
+            }
+            else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
+                String statusMessage = jsonObject.getString("message");
+                System.out.println(statusMessage);
             }
 
         }

@@ -126,6 +126,21 @@ public class SMTApi {
         SendUpdate("TEST_NAME", 10);
     }
 
+    public void ChangeActionName(String ActionName, String newActionName){
+        actions.forEach((action) ->{
+            if(Objects.equals(action.GetName(), ActionName)){
+                action.SetName(newActionName);
+            }
+        });
+    }
+    public void ChangeActionMethod(String actionName, Runnable newActionMethod){
+        actions.forEach((action) ->{
+            if(Objects.equals(action.GetName(), actionName)){
+                action.SetMethod(newActionMethod);
+            }
+        });
+    }
+
     public void Close() {
         serverSocket.CloseSocket();
     }

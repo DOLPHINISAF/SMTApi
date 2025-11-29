@@ -5,6 +5,8 @@ out/
 .idea/
 SMTApi.iml
 src/TestMain.java
+src/Test.java
+src/DOLPHIN/ServerMonitorTool/Test.java
 
 ### Eclipse ###
 .apt_generated

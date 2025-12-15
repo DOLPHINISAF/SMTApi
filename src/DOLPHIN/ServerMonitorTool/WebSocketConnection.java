@@ -21,7 +21,8 @@ public class WebSocketConnection {
     public boolean queueMutex;
 
     public WebSocketConnection(){
-        serverURI = "ws://dolphinisaf.ddns.net:1337";
+        //serverURI = "ws://dolphinisaf.ddns.net:1337";
+        serverURI = "ws://localhost:1337";
         webSocket = null;
         client = null;
         bConnected = false;
@@ -96,7 +97,6 @@ public class WebSocketConnection {
 
         @Override
         public void onOpen(WebSocket webSocket) {
-            System.out.println("WebSocket opened");
             WebSocket.Listener.super.onOpen(webSocket);
         }
 

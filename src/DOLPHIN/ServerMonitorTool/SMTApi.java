@@ -1,20 +1,15 @@
 package DOLPHIN.ServerMonitorTool;
 
-import java.net.URI;
-import java.net.http.*;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import org.json.*;
 
 public class SMTApi {
 
     private String APIKey;
-    WebSocketConnection serverSocket;
+    private WebSocketConnection serverSocket;
 
-    ArrayList<Action> actions;
+    private ArrayList<Action> actions;
 
 
     public SMTApi() {
@@ -120,7 +115,7 @@ public class SMTApi {
     }
 
     public void Test(){
-
+        APIKey = "FEAG43FDG3";
         Auth();
 
         if(!serverSocket.IsConnected()){

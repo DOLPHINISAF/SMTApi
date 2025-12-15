@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.http.*;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
@@ -18,6 +19,7 @@ public class WebSocketConnection {
     private boolean bConnected;
 
     Queue<JSONObject> receivedJsonQueue;
+    BlockingQueue<JSONObject> blockingreceivedJsonQueue;
     public boolean queueMutex;
 
     public WebSocketConnection(){
@@ -78,7 +80,7 @@ public class WebSocketConnection {
     }
 
     public JSONObject GetReceivedJSON(){
-        return receivedJsonQueue.poll();
+        return blockingreceivedJsonQueue.poll();
     }
 
     public void CloseSocket(){
@@ -108,13 +110,16 @@ public class WebSocketConnection {
             JSONObject receivedJson = new JSONObject(receivedData);
             System.out.println("Parsed received text to JSON");
 
-            //while main thread uses the JSON queue we block websockets access to modifying it
-            while(queueMutex){
 
+            while(!blockingreceivedJsonQueue.offer(receivedJson)){
+                System.out.println("JSON queue blocked retrying");
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    System.out.println("Failed to sleep thread");
+                }
             }
-            queueMutex = true;
 
-            receivedJsonQueue.offer(receivedJson);
 
             queueMutex = false;
 

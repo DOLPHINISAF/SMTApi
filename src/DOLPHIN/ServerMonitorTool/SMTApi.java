@@ -44,27 +44,24 @@ public class SMTApi {
 
     private void HandleReceivedJSON(){
 
-        if(!serverSocket.queueMutex){
-            serverSocket.queueMutex = true;
-            JSONObject jsonObject = serverSocket.GetReceivedJSON();
+        //TODO: make GetReceivedJSON() return all the jsons received and parse them here
+        JSONObject jsonObject = serverSocket.GetReceivedJSON();
 
-            //TODO: Make this a switch for multiple types
+        //TODO: Make this a switch for multiple types
 
-            if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
-                String actionName = jsonObject.getString("action_name");
-                actions.forEach((action) ->{
-                    if(Objects.equals(action.GetName(), actionName)){
-                        action.Run();
-                    }
-                });
-            }
-            else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
-                String statusMessage = jsonObject.getString("message");
-                System.out.println(statusMessage);
-            }
-
+        if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
+            String actionName = jsonObject.getString("action_name");
+            actions.forEach((action) ->{
+                if(Objects.equals(action.GetName(), actionName)){
+                    action.Run();
+                }
+            });
         }
-        serverSocket.queueMutex = false;
+        else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
+            String statusMessage = jsonObject.getString("message");
+            System.out.println(statusMessage);
+        }
+
     }
 
     public void CreateAction(String actionName, Runnable code){

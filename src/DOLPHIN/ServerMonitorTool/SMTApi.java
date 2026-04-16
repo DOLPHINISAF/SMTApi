@@ -1,20 +1,15 @@
 package DOLPHIN.ServerMonitorTool;
 
-import java.net.URI;
-import java.net.http.*;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import org.json.*;
 
 public class SMTApi {
 
     private String APIKey;
-    WebSocketConnection serverSocket;
+    private WebSocketConnection serverSocket;
 
-    ArrayList<Action> actions;
+    private ArrayList<Action> actions;
 
 
     public SMTApi() {
@@ -49,27 +44,24 @@ public class SMTApi {
 
     private void HandleReceivedJSON(){
 
-        if(!serverSocket.queueMutex){
-            serverSocket.queueMutex = true;
-            JSONObject jsonObject = serverSocket.GetReceivedJSON();
+        //TODO: make GetReceivedJSON() return all the jsons received and parse them here
+        JSONObject jsonObject = serverSocket.GetReceivedJSON();
 
-            //TODO: Make this a switch for multiple types
+        //TODO: Make this a switch for multiple types
 
-            if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
-                String actionName = jsonObject.getString("action_name");
-                actions.forEach((action) ->{
-                    if(Objects.equals(action.GetName(), actionName)){
-                        action.Run();
-                    }
-                });
-            }
-            else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
-                String statusMessage = jsonObject.getString("message");
-                System.out.println(statusMessage);
-            }
-
+        if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
+            String actionName = jsonObject.getString("action_name");
+            actions.forEach((action) ->{
+                if(Objects.equals(action.GetName(), actionName)){
+                    action.Run();
+                }
+            });
         }
-        serverSocket.queueMutex = false;
+        else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
+            String statusMessage = jsonObject.getString("message");
+            System.out.println(statusMessage);
+        }
+
     }
 
     public void CreateAction(String actionName, Runnable code){
@@ -120,7 +112,7 @@ public class SMTApi {
     }
 
     public void Test(){
-
+        APIKey = "FEAG43FDG3";
         Auth();
 
         if(!serverSocket.IsConnected()){

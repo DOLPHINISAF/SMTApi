@@ -21,7 +21,7 @@ public class WebSocketConnection {
     public boolean queueMutex;
 
     public WebSocketConnection(){
-        serverURI = "ws://dolphinisaf.ddns.net:1337";
+        serverURI = "ws://dolphinsibiu.ddns.net:1337";
         webSocket = null;
         client = null;
         bConnected = false;
@@ -36,7 +36,7 @@ public class WebSocketConnection {
         URI server = URI.create(serverURI);
         try {
             webSocket = client.newWebSocketBuilder().buildAsync(server, new WebSocketConnection.WebSocketListener()).join();
-            System.out.println("Created websocket");
+            //System.out.println("Created websocket");
 
         }
         catch (CompletionException e){
@@ -106,7 +106,7 @@ public class WebSocketConnection {
 
             String receivedData = data.toString();
             JSONObject receivedJson = new JSONObject(receivedData);
-            System.out.println("Parsed received text to JSON");
+            //System.out.println("Parsed received text to JSON");
 
             //while main thread uses the JSON queue we block websockets access to modifying it
             while(queueMutex){

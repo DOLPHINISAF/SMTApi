@@ -4,36 +4,69 @@ import java.util.ArrayList;
 import java.util.Objects;
 import org.json.*;
 
+
 public class SMTApi {
-
+    Boolean bIsAuth;
     private String APIKey;
-    private WebSocketConnection serverSocket;
+    WebSocketConnection serverSocket;
 
-    private ArrayList<Action> actions;
+    ArrayList<Action> actions;
 
+    private enum JsonKeys{
+        TYPE("type"),
+        SOURCE("source"),
+        NAMEID("nameID"),
+        DESCRIPTION("description"),
+        APIKEY("APIKey"),
+        VALUE("value"),
+        UNIT("unit"),
+        DATA("data");
+
+        public final String label;
+
+        private JsonKeys(String label) {
+            this.label = label;
+
+        }
+
+    }
+    private enum MessageType{
+        AUTH("auth"),
+        ADD("add"),
+        DATA("data");
+
+        public final String label;
+
+        private MessageType(String label) {
+            this.label = label;
+
+        }
+
+    }
 
     public SMTApi() {
-
+        bIsAuth = false;
         actions = new ArrayList<>();
 
         serverSocket = new WebSocketConnection();
-
-        if(serverSocket.ConnectSocket()){
-            System.out.println("Error connecting socket! Check errors");
-        }
 
     }
 
     private void Auth(){
 
+        if(!serverSocket.IsConnected()) return;
+
         JSONObject jsonObject = new JSONObject();
 
-        jsonObject.put("type", "auth");
-        jsonObject.put("source","api");
-        jsonObject.put("APIKey",APIKey);
+        jsonObject.put(JsonKeys.TYPE.label, MessageType.AUTH.label);
+        jsonObject.put(JsonKeys.SOURCE.label,"api");
+        jsonObject.put(JsonKeys.APIKEY.label,APIKey);
 
+        serverSocket.SendJson(jsonObject);
+        //we freeze until we get response from server, should be auth-status type
+        HandleReceivedJSON(true);
 
-        if(!serverSocket.SendJson(jsonObject)){
+        if(bIsAuth){
             System.out.println("Succesfully authentificated to server");
         }
         else{
@@ -42,24 +75,49 @@ public class SMTApi {
 
     }
 
-    private void HandleReceivedJSON(){
+    public void HandleReceivedJSON(){
+        HandleReceivedJSON(false);
+    }
 
-        //TODO: make GetReceivedJSON() return all the jsons received and parse them here
-        JSONObject jsonObject = serverSocket.GetReceivedJSON();
+    //if the user wants to infinitely wait until socket gets a message bFreezeUntilReceived should be true
+    public void HandleReceivedJSON(Boolean bFreezeUntilReceived){
 
-        //TODO: Make this a switch for multiple types
-
-        if(Objects.equals(jsonObject.getString("type"), "RUN_ACTION")){
-            String actionName = jsonObject.getString("action_name");
-            actions.forEach((action) ->{
-                if(Objects.equals(action.GetName(), actionName)){
-                    action.Run();
-                }
-            });
+        if(!serverSocket.IsConnected()){
+            serverSocket.ConnectSocket();
         }
-        else if(Objects.equals(jsonObject.getString("type"), "AUTH_STATUS")){
-            String statusMessage = jsonObject.getString("message");
-            System.out.println(statusMessage);
+
+        JSONObject jsonObject = null;
+
+        //will loop only when authentificating, waiting for auth response
+        do {
+            jsonObject = serverSocket.GetReceivedJSON();
+        }while(jsonObject == null && bFreezeUntilReceived);
+
+        if(jsonObject == null) return;
+
+
+        String messageType = jsonObject.getString("type");
+
+        switch (messageType){
+            case "run_action":
+                String actionName = jsonObject.getString("actionID");
+                actions.forEach((action) -> {
+                    if (Objects.equals(action.GetName(), actionName)) {
+                        action.Run();
+                    }
+                });
+                break;
+
+            case "auth-status":
+                String statusMessage = jsonObject.getString("result");
+                System.out.println(statusMessage);
+
+                if (Objects.equals(statusMessage, "accepted")) {
+                    bIsAuth = true;
+                }
+                break;
+            default:
+
         }
 
     }
@@ -69,17 +127,19 @@ public class SMTApi {
     }
 
     public void AddParam(String nameID, String description, String unit){
-
+        if(!serverSocket.IsConnected() || !bIsAuth) return;
 
         JSONObject jsonObject = new JSONObject();
 
-        jsonObject.put("type", "add");
-        jsonObject.put("source","api");
-        jsonObject.put("nameID",nameID);
-        jsonObject.put("description",description);
-        jsonObject.put("unit",unit);
+        jsonObject.put(JsonKeys.TYPE.label, MessageType.ADD.label);
+        jsonObject.put(JsonKeys.SOURCE.label,"api");
+        jsonObject.put(JsonKeys.NAMEID.label,nameID);
+        jsonObject.put(JsonKeys.DESCRIPTION.label,description);
+        jsonObject.put(JsonKeys.UNIT.label,unit);
+        jsonObject.put(JsonKeys.APIKEY.label, APIKey);
 
         serverSocket.SendJson(jsonObject);
+
         System.out.println("Added param");
 
     }
@@ -95,33 +155,24 @@ public class SMTApi {
 
     public void SendUpdate(String nameID, String value){
 
+        if(!serverSocket.IsConnected() || !bIsAuth) return;
+
         JSONObject jsonObject = new JSONObject();
 
-        jsonObject.put("type", "data");
-        jsonObject.put("source","api");
-        jsonObject.put("nameID",nameID);
-        jsonObject.put("data",value);
+        jsonObject.put(JsonKeys.TYPE.label, MessageType.DATA.label);
+        jsonObject.put(JsonKeys.SOURCE.label,"api");
+        jsonObject.put(JsonKeys.NAMEID.label,nameID);
+        jsonObject.put(JsonKeys.DATA.label,value);
+        jsonObject.put(JsonKeys.APIKEY.label, APIKey);
 
         serverSocket.SendJson(jsonObject);
     }
 
-    public void SendText(String text){
-
-        serverSocket.SendText(text);
-        System.out.println("Added param");
-    }
-
     public void Test(){
-        APIKey = "FEAG43FDG3";
-        Auth();
-
-        if(!serverSocket.IsConnected()){
-            System.out.println("Socket is not open/doesn not exist!");
-            return;
-        }
 
         AddParam("TEST_NAME","MY DESCRIPTION","BYTES/SECOND");
         SendUpdate("TEST_NAME", 10);
+
     }
 
     public void ChangeActionName(String ActionName, String newActionName){
@@ -131,6 +182,7 @@ public class SMTApi {
             }
         });
     }
+
     public void ChangeActionMethod(String actionName, Runnable newActionMethod){
         actions.forEach((action) ->{
             if(Objects.equals(action.GetName(), actionName)){

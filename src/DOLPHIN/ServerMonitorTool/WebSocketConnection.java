@@ -5,10 +5,7 @@ import org.json.JSONObject;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.*;
 
 
 public class WebSocketConnection {
@@ -17,41 +14,41 @@ public class WebSocketConnection {
     private WebSocket webSocket;
     private HttpClient client;
     private boolean bConnected;
-
-    Queue<JSONObject> receivedJsonQueue;
     BlockingQueue<JSONObject> blockingreceivedJsonQueue;
-    public boolean queueMutex;
 
     public WebSocketConnection(){
         serverURI = "ws://dolphinsibiu.ddns.net:1337";
         webSocket = null;
         client = null;
-        bConnected = false;
-        receivedJsonQueue = new LinkedList<>();
-        queueMutex = false;
+        blockingreceivedJsonQueue = new LinkedBlockingQueue<>();
+
+        ConnectSocket();
+
     }
 
-    public boolean ConnectSocket(){
+    public void ConnectSocket(){
         client = HttpClient.newHttpClient();
         System.out.println("Created http client");
 
         URI server = URI.create(serverURI);
         try {
+
             webSocket = client.newWebSocketBuilder().buildAsync(server, new WebSocketConnection.WebSocketListener()).join();
             System.out.println("Created websocket");
-
+            bConnected = true;
         }
         catch (CompletionException e){
             System.out.println("Caught CompletionException when creating websocket!");
             bConnected = false;
-            return true;
         }
-        bConnected = true;
-        return false;
+
     }
 
     //method to send json object that is already parsed to string
     public boolean SendJson(String message){
+
+        if(!bConnected) return true;
+
         try {
             webSocket.sendText(message, true);
             System.out.println("Sent json data!");
@@ -70,6 +67,7 @@ public class WebSocketConnection {
     }
 
     public void SendText(String text){
+        if(!bConnected) return;
         try{
             webSocket.sendText(text,true);
         }
@@ -110,25 +108,17 @@ public class WebSocketConnection {
             JSONObject receivedJson = new JSONObject(receivedData);
             System.out.println("Parsed received text to JSON");
 
-            //while main thread uses the JSON queue we block websockets access to modifying it
-            while(queueMutex){
 
-            while(!blockingreceivedJsonQueue.offer(receivedJson)){
-                System.out.println("JSON queue blocked retrying");
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    System.out.println("Failed to sleep thread");
-                }
+            try {
+                blockingreceivedJsonQueue.put(receivedJson);
+            } catch (InterruptedException e) {
+                System.out.println("Websocket failed to put json message in blocking queue");
             }
-            queueMutex = true;
 
-            receivedJsonQueue.offer(receivedJson);
-
-            queueMutex = false;
 
             return WebSocket.Listener.super.onText(webSocket, data, last);
         }
+
 
         @Override
         public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
@@ -150,6 +140,7 @@ public class WebSocketConnection {
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+            bConnected = false;
             System.out.println("WebSocket closed: " + reason);
             return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
         }
@@ -157,6 +148,7 @@ public class WebSocketConnection {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             System.err.println("WebSocket error: " + error.getMessage());
+            bConnected = false;
         }
     }
 

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 import org.json.*;
 
-
+//TODO: add class that holds all parameter updates and sends regularly to backend so we don't spam it
 public class SMTApi {
     Boolean bIsAuth;
     private String APIKey;
@@ -16,11 +16,9 @@ public class SMTApi {
         TYPE("type"),
         SOURCE("source"),
         NAMEID("nameID"),
-        DESCRIPTION("description"),
         APIKEY("APIKey"),
-        VALUE("value"),
-        UNIT("unit"),
-        DATA("data");
+        VALUE("data"),
+        UNIT("unit");
 
         public final String label;
 
@@ -31,9 +29,8 @@ public class SMTApi {
 
     }
     private enum MessageType{
-        AUTH("auth"),
-        ADD("add"),
-        DATA("data");
+        AUTH_TYPE("auth-api"),
+        DATA_TYPE("data");
 
         public final String label;
 
@@ -58,40 +55,24 @@ public class SMTApi {
 
         JSONObject jsonObject = new JSONObject();
 
-        jsonObject.put(JsonKeys.TYPE.label, MessageType.AUTH.label);
-        jsonObject.put(JsonKeys.SOURCE.label,"api");
+        jsonObject.put(JsonKeys.TYPE.label, MessageType.AUTH_TYPE.label);
         jsonObject.put(JsonKeys.APIKEY.label,APIKey);
 
         serverSocket.SendJson(jsonObject);
-        //we freeze until we get response from server, should be auth-status type
-        HandleReceivedJSON(true);
 
-        if(bIsAuth){
-            System.out.println("Succesfully authentificated to server");
-        }
-        else{
-            System.out.println("Failed to authentificate to server!");
-        }
-
-    }
-
-    public void HandleReceivedJSON(){
-        HandleReceivedJSON(false);
     }
 
     //if the user wants to infinitely wait until socket gets a message bFreezeUntilReceived should be true
-    public void HandleReceivedJSON(Boolean bFreezeUntilReceived){
+    public void HandleReceivedJSON(){
 
+        //if we are not connected to the server for any reason we retry
+        //maybe server restarted and we only need to reconnectW
         if(!serverSocket.IsConnected()){
             serverSocket.ConnectSocket();
+            Auth();
         }
 
-        JSONObject jsonObject = null;
-
-        //will loop only when authentificating, waiting for auth response
-        do {
-            jsonObject = serverSocket.GetReceivedJSON();
-        }while(jsonObject == null && bFreezeUntilReceived);
+        JSONObject jsonObject = serverSocket.GetReceivedJSON();
 
         if(jsonObject == null) return;
 
@@ -113,7 +94,11 @@ public class SMTApi {
                 System.out.println(statusMessage);
 
                 if (Objects.equals(statusMessage, "accepted")) {
+                    System.out.println("Succesfully authentificated to server");
                     bIsAuth = true;
+                }
+                else{
+                    System.out.println("Failed to authentificate to server!");
                 }
                 break;
             default:
@@ -126,69 +111,25 @@ public class SMTApi {
         actions.add(new Action(actionName,code));
     }
 
-    public void AddParam(String nameID, String description, String unit){
-        if(!serverSocket.IsConnected() || !bIsAuth) return;
-
-        JSONObject jsonObject = new JSONObject();
-
-        jsonObject.put(JsonKeys.TYPE.label, MessageType.ADD.label);
-        jsonObject.put(JsonKeys.SOURCE.label,"api");
-        jsonObject.put(JsonKeys.NAMEID.label,nameID);
-        jsonObject.put(JsonKeys.DESCRIPTION.label,description);
-        jsonObject.put(JsonKeys.UNIT.label,unit);
-        jsonObject.put(JsonKeys.APIKEY.label, APIKey);
-
-        serverSocket.SendJson(jsonObject);
-
-        System.out.println("Added param");
-
-    }
-
     public void SetApiKey(String APIKey){
         this.APIKey = APIKey;
         Auth();
     }
 
-    public void SendUpdate(String nameID, int value){
-        SendUpdate(nameID,Integer.toString(value));
-    }
-
     public void SendUpdate(String nameID, String value){
-
+        //we don't try to send anything if we aren't connected
+        //or authentificated
         if(!serverSocket.IsConnected() || !bIsAuth) return;
 
         JSONObject jsonObject = new JSONObject();
 
-        jsonObject.put(JsonKeys.TYPE.label, MessageType.DATA.label);
+        jsonObject.put(JsonKeys.TYPE.label, MessageType.DATA_TYPE.label);
         jsonObject.put(JsonKeys.SOURCE.label,"api");
         jsonObject.put(JsonKeys.NAMEID.label,nameID);
-        jsonObject.put(JsonKeys.DATA.label,value);
+        jsonObject.put(JsonKeys.VALUE.label,value);
         jsonObject.put(JsonKeys.APIKEY.label, APIKey);
 
         serverSocket.SendJson(jsonObject);
-    }
-
-    public void Test(){
-
-        AddParam("TEST_NAME","MY DESCRIPTION","BYTES/SECOND");
-        SendUpdate("TEST_NAME", 10);
-
-    }
-
-    public void ChangeActionName(String ActionName, String newActionName){
-        actions.forEach((action) ->{
-            if(Objects.equals(action.GetName(), ActionName)){
-                action.SetName(newActionName);
-            }
-        });
-    }
-
-    public void ChangeActionMethod(String actionName, Runnable newActionMethod){
-        actions.forEach((action) ->{
-            if(Objects.equals(action.GetName(), actionName)){
-                action.SetMethod(newActionMethod);
-            }
-        });
     }
 
     public void Close() {

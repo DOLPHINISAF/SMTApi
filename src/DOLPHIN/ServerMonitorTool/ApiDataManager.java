@@ -1,10 +1,10 @@
 package DOLPHIN.ServerMonitorTool;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class ApiDataManager {
 
@@ -62,13 +62,43 @@ public class ApiDataManager {
 
     private Map<String, String> parameterLatestUpdates;
 
+    private BlockingQueue<JSONObject> sendQueue;
+    ScheduledExecutorService executor ;
+
     ApiDataManager(){
         actions = new HashMap<>();
         serverSocket = new WebSocketConnection();
 
         bIsAuth = false;
 
-        parameterLatestUpdates = new HashMap<>();
+        sendQueue = new LinkedBlockingQueue<>();
+
+        parameterLatestUpdates = new ConcurrentHashMap<>();
+
+        executor = Executors.newSingleThreadScheduledExecutor();
+
+        executor.scheduleAtFixedRate(() ->{
+            if(!bIsAuth) return;
+
+            try{
+                //we get the latest parameter values from the hashmap and add them inside the json list we send to backend
+                for(Map.Entry<String, String> parameter : parameterLatestUpdates.entrySet()){
+                    String parameterName = parameter.getKey();
+                    String parameterValue = parameter.getValue();
+
+                    EnqueueParameterUpdate(parameterName, parameterValue);
+                }
+                List<JSONObject> batch = new ArrayList<>();
+                sendQueue.drainTo(batch);
+
+                for(JSONObject message : batch){
+                    serverSocket.SendJson(message);
+                }
+            }
+            catch(Exception ignored){
+
+            }
+        },0,5000, TimeUnit.MILLISECONDS);
     }
 
     private void TryAuth(){
@@ -93,37 +123,40 @@ public class ApiDataManager {
             serverSocket.ConnectSocket();
             TryAuth();
         }
+        try {
+            JSONObject jsonObject = serverSocket.GetReceivedJSON();
 
-        JSONObject jsonObject = serverSocket.GetReceivedJSON();
+            while (jsonObject != null) {
 
-        if(jsonObject == null) return;
+                String messageType = jsonObject.getString("type");
 
+                switch (messageType) {
+                    case "run_action":
+                        ActionStatus actionStatus;
+                        String actionName = jsonObject.getString("actionID");
+                        actionStatus = RunAction(actionName);
+                        SendActionStatus(actionStatus, actionName);
+                        break;
 
-        String messageType = jsonObject.getString("type");
+                    case "auth-status":
+                        String statusMessage = jsonObject.getString("result");
 
-        switch (messageType){
-            case "run_action":
-                ActionStatus actionStatus;
-                String actionName = jsonObject.getString("actionID");
-                actionStatus = RunAction(actionName);
-                SendActionStatus(actionStatus, actionName);
-                break;
-            case "auth-status":
-                String statusMessage = jsonObject.getString("result");
-                System.out.println(statusMessage);
+                        if (Objects.equals(statusMessage, "accepted")) {
+                            bIsAuth = true;
+                        } else {
+                            System.out.println("Failed to authentificate to server!");
+                        }
+                        break;
 
-                if (Objects.equals(statusMessage, "accepted")) {
-                    System.out.println("Succesfully authentificated to server");
-                    bIsAuth = true;
+                    default:
+                        System.out.println("Unknown message type!");
                 }
-                else{
-                    System.out.println("Failed to authentificate to server!");
-                }
-                break;
-            default:
-
+                jsonObject = serverSocket.GetReceivedJSON();
+            }
         }
-
+        catch (JSONException e){
+            System.out.println("Failed to access json message required keys!");
+        }
     }
 
     private void SendActionStatus(ActionStatus status, String name){
@@ -135,7 +168,10 @@ public class ApiDataManager {
         jsonObject.put(JsonKeys.APIKEY.label, APIKey);
         jsonObject.put(JsonKeys.STATUS.label, status.label);
 
-        serverSocket.SendJson(jsonObject);
+        try {
+            sendQueue.put(jsonObject);
+        }
+        catch (Exception ignored){}
     }
 
     private ActionStatus RunAction(String actionName){
@@ -156,7 +192,11 @@ public class ApiDataManager {
     public void UpdateParameter(String nameID, String value){
         //we don't try to send anything if we aren't connected
         //or authentificated
-        if(!serverSocket.IsConnected() || !bIsAuth) return;
+
+        parameterLatestUpdates.put(nameID, value);
+    }
+
+    public void EnqueueParameterUpdate(String nameID, String value){
 
         JSONObject jsonObject = new JSONObject();
 
@@ -166,9 +206,12 @@ public class ApiDataManager {
         jsonObject.put(JsonKeys.VALUE.label,value);
         jsonObject.put(JsonKeys.APIKEY.label, APIKey);
 
-        serverSocket.SendJson(jsonObject);
+        try {
+            sendQueue.put(jsonObject);
+        } catch (InterruptedException e) {
+            System.out.println("Failed to put json message in blocking queue");
+        }
     }
-
     public void SetApiKey(String APIKey){
         this.APIKey = APIKey;
         TryAuth();

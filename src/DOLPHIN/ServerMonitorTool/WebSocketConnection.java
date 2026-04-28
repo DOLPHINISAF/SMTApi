@@ -1,7 +1,9 @@
 package DOLPHIN.ServerMonitorTool;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.ByteBuffer;
@@ -14,33 +16,35 @@ public class WebSocketConnection {
     private WebSocket webSocket;
     private HttpClient client;
     private boolean bConnected;
-    BlockingQueue<JSONObject> blockingreceivedJsonQueue;
+    BlockingQueue<JSONObject> blockingReceivedJsonQueue;
 
     public WebSocketConnection(){
         serverURI = "wss://dolphinsibiu.ddns.net:1337";
         webSocket = null;
         client = null;
-        blockingreceivedJsonQueue = new LinkedBlockingQueue<>();
+        blockingReceivedJsonQueue = new LinkedBlockingQueue<>();
 
         ConnectSocket();
 
     }
 
     public void ConnectSocket(){
-        client = HttpClient.newHttpClient();
-        System.out.println("Created http client");
-
-        URI server = URI.create(serverURI);
+        bConnected = false;
         try {
+            client = HttpClient.newHttpClient();
+
+            URI server = URI.create(serverURI);
 
             webSocket = client.newWebSocketBuilder().buildAsync(server, new WebSocketConnection.WebSocketListener()).join();
-            System.out.println("Created websocket");
             bConnected = true;
         }
-        catch (CompletionException e){
-            System.out.println("Caught CompletionException when creating websocket!");
-            bConnected = false;
+        catch (UncheckedIOException e){
+            System.out.println("Cannot create httpclient!");
         }
+        catch (Exception e){
+            System.out.println("Caught unexpected error when creating websocket!");
+        }
+
 
     }
 
@@ -52,7 +56,6 @@ public class WebSocketConnection {
 
         try {
             webSocket.sendText(message, true);
-            System.out.println("Sent json data!");
         }
         catch (IllegalStateException e){
             System.out.println("Failed to send json!");
@@ -61,7 +64,7 @@ public class WebSocketConnection {
     }
 
     public JSONObject GetReceivedJSON(){
-        return blockingreceivedJsonQueue.poll();
+        return blockingReceivedJsonQueue.poll();
     }
 
     public void CloseSocket(){
@@ -80,22 +83,23 @@ public class WebSocketConnection {
 
         @Override
         public void onOpen(WebSocket webSocket) {
-            System.out.println("WebSocket opened");
+            System.out.println("Api webSocket opened");
             WebSocket.Listener.super.onOpen(webSocket);
         }
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            System.out.println("Received message: " + data);
-
-            String receivedData = data.toString();
-            JSONObject receivedJson = new JSONObject(receivedData);
-            System.out.println("Parsed received text to JSON");
-
 
             try {
-                blockingreceivedJsonQueue.put(receivedJson);
-            } catch (InterruptedException e) {
+                String receivedData = data.toString();
+                JSONObject receivedJson = new JSONObject(receivedData);
+
+                blockingReceivedJsonQueue.put(receivedJson);
+            }
+            catch (JSONException e){
+                System.out.println("Failed to parse received message to json!");
+            }
+            catch (Exception e) {
                 System.out.println("Websocket failed to put json message in blocking queue");
             }
 

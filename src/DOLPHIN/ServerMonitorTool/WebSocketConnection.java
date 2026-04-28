@@ -44,10 +44,11 @@ public class WebSocketConnection {
 
     }
 
-    //method to send json object that is already parsed to string
-    public boolean SendJson(String message){
+    //method for sending json object without the need to parse it to string
+    public void SendJson(JSONObject jsonObject){
+        String message = jsonObject.toString();
 
-        if(!bConnected) return true;
+        if(!bConnected) return;
 
         try {
             webSocket.sendText(message, true);
@@ -55,25 +56,8 @@ public class WebSocketConnection {
         }
         catch (IllegalStateException e){
             System.out.println("Failed to send json!");
-            return true;
         }
 
-        return false;
-    }
-
-    //method for sending json object without the need to parse it to string
-    public boolean SendJson(JSONObject jsonObject){
-        return SendJson(jsonObject.toString());
-    }
-
-    public void SendText(String text){
-        if(!bConnected) return;
-        try{
-            webSocket.sendText(text,true);
-        }
-        catch (IllegalStateException e){
-            System.out.println("ERROR sending text!!");
-        }
     }
 
     public JSONObject GetReceivedJSON(){

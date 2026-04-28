@@ -17,7 +17,7 @@ public class WebSocketConnection {
     BlockingQueue<JSONObject> blockingreceivedJsonQueue;
 
     public WebSocketConnection(){
-        serverURI = "ws://dolphinsibiu.ddns.net:1337";
+        serverURI = "wss://dolphinsibiu.ddns.net:1337";
         webSocket = null;
         client = null;
         blockingreceivedJsonQueue = new LinkedBlockingQueue<>();

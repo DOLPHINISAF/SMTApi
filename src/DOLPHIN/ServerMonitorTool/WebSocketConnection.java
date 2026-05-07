@@ -16,6 +16,7 @@ public class WebSocketConnection {
     private WebSocket webSocket;
     private HttpClient client;
     private boolean bConnected;
+    private boolean bTryingToConnect;
     BlockingQueue<JSONObject> blockingReceivedJsonQueue;
 
     public WebSocketConnection(){
@@ -24,12 +25,20 @@ public class WebSocketConnection {
         client = null;
         blockingReceivedJsonQueue = new LinkedBlockingQueue<>();
 
+        bTryingToConnect = false;
+
+        bConnected = false;
+
         ConnectSocket();
 
     }
 
     public void ConnectSocket(){
-        bConnected = false;
+
+        if(bTryingToConnect){
+            return;
+        }
+        bTryingToConnect = true;
         try {
             client = HttpClient.newHttpClient();
 
@@ -45,7 +54,7 @@ public class WebSocketConnection {
             System.out.println("Caught unexpected error when creating websocket!");
         }
 
-
+        bTryingToConnect = false;
     }
 
     //method for sending json object without the need to parse it to string
@@ -135,7 +144,7 @@ public class WebSocketConnection {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
-            System.err.println("WebSocket error: " + error.getMessage());
+            System.err.println("WebSocket closed unexpectedly. Error: " + error.getMessage());
             bConnected = false;
         }
     }

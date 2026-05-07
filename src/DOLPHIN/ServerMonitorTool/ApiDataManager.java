@@ -53,7 +53,11 @@ public class ApiDataManager {
         }
     }
 
+    //separation between packet upload rate in ms
+    private static final int UPLOAD_RATE = 10;
+
     Boolean bIsAuth;
+    Boolean bIsTryingToAuth;
     private String APIKey;
     WebSocketConnection serverSocket;
 
@@ -70,6 +74,7 @@ public class ApiDataManager {
         serverSocket = new WebSocketConnection();
 
         bIsAuth = false;
+        bIsTryingToAuth = false;
 
         sendQueue = new LinkedBlockingQueue<>();
 
@@ -98,12 +103,14 @@ public class ApiDataManager {
             catch(Exception ignored){
 
             }
-        },0,5000, TimeUnit.MILLISECONDS);
+        },0,UPLOAD_RATE, TimeUnit.MILLISECONDS);
     }
 
     private void TryAuth(){
 
-        if(!serverSocket.IsConnected()) return;
+        if(!serverSocket.IsConnected() || bIsTryingToAuth) return;
+
+        bIsTryingToAuth = true;
 
         JSONObject jsonObject = new JSONObject();
 
@@ -139,12 +146,17 @@ public class ApiDataManager {
                         break;
 
                     case "auth-status":
+                        bIsTryingToAuth = false;
                         String statusMessage = jsonObject.getString("result");
 
                         if (Objects.equals(statusMessage, "accepted")) {
                             bIsAuth = true;
                         } else {
                             System.out.println("Failed to authentificate to server!");
+                            String reason = jsonObject.getString("reason");
+
+                            System.out.println("Reason: " + reason);
+
                         }
                         break;
 
@@ -212,6 +224,7 @@ public class ApiDataManager {
             System.out.println("Failed to put json message in blocking queue");
         }
     }
+
     public void SetApiKey(String APIKey){
         this.APIKey = APIKey;
         TryAuth();

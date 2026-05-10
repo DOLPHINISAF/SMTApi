@@ -32,6 +32,11 @@ public class SMTApi {
     public void UpdateParameter(String nameID, String value){
         apiManager.UpdateParameter(nameID, value);
     }
+    //sets the update rate of sending network packets(update parameter packets) in miliseconds per update
+    //minimum is 250 ms
+    public void SetUpdateRate(int value){
+        apiManager.SetUpdateRate(value);
+    }
 
     public void CloseApi() {
         apiManager.Close();

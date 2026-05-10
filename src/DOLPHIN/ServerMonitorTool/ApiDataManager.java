@@ -54,7 +54,7 @@ public class ApiDataManager {
     }
 
     //separation between packet upload rate in ms
-    private static final int UPLOAD_RATE = 10;
+    private static  int UPLOAD_RATE = 500;
 
     Boolean bIsAuth;
     Boolean bIsTryingToAuth;
@@ -234,6 +234,13 @@ public class ApiDataManager {
         actions.put(actionName,code);
     }
 
+    public void SetUpdateRate(int value){
+        if(value >= 250)
+            UPLOAD_RATE = value;
+        else{
+            UPLOAD_RATE = 250;
+        }
+    }
     public void Close() {
         serverSocket.CloseSocket();
     }
